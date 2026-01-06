@@ -1,4 +1,4 @@
-# 🏭 Industrial Data Foundation (ETL Pipeline)
+# 🏭 Industrial Data Foundation (Pipeline ETL)
 
 Pipeline de Engenharia de Dados construído com **Apache Airflow** para processamento de dados trabalhistas (CAGED). O projeto simula um ambiente de Big Data completo, desde a ingestão até a disponibilização em Data Lake particionado.
 
