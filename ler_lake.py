@@ -1,34 +1,72 @@
 import pandas as pd
 from pathlib import Path
+import os
 
-# Caminho onde os dados estão salvos
-caminho_silver = Path.home() / 'airflow/datalake/silver/caged_processed.parquet'
+# Configuração de caminhos (Assumindo estrutura padrão do Airflow local)
+BASE_DIR = Path.home() / 'airflow' / 'datalake'
+SILVER_DIR = BASE_DIR / 'silver' / 'caged_processed.parquet'
 
-print("="*50)
-print(f"📂 Lendo dados de: {caminho_silver}")
-print("="*50)
+def main():
+    print("="*80)
+    print(f"🏭 INDUSTRIAL DATA FOUNDATION - VALIDAÇÃO DO DATA LAKE (SILVER)")
+    print("="*80)
 
-# 1. Ler o Data Lake INTEIRO
-# O Pandas junta todas as pastas (uf=SP, uf=CE, etc) automaticamente
-df_total = pd.read_parquet(caminho_silver)
+    if not SILVER_DIR.exists():
+        print(f"[ERRO] Diretório não encontrado: {SILVER_DIR}")
+        print("Certifique-se de que a DAG já foi executada com sucesso.")
+        return
 
-print(f"\n🌎 TOTAL BRASIL:")
-print(f"   Linhas: {len(df_total)}")
-print(f"   Colunas: {list(df_total.columns)}")
-print("\n   Amostra aleatória:")
-print(df_total.sample(3))
+    # 1. Análise Física (Partições)
+    print(f"\n📂 ANÁLISE DE ARMAZENAMENTO")
+    print(f"Caminho Base: {SILVER_DIR}")
+    
+    # Listar partições (pastas uf=XX)
+    particoes = sorted(list(SILVER_DIR.glob('uf=*')))
+    
+    if not particoes:
+        print("[AVISO] Nenhuma partição encontrada.")
+    else:
+        print(f"Total de Partições (UFs): {len(particoes)}")
+        print("\nDetalhamento por Partição:")
+        print(f"{'PARTIÇÃO':<15} | {'ARQUIVOS':<10} | {'TAMANHO (KB)':<15}")
+        print("-" * 45)
+        
+        total_arquivos = 0
+        
+        for p in particoes:
+            arquivos = list(p.glob('*.parquet'))
+            qtd_arquivos = len(arquivos)
+            tamanho_kb = sum(f.stat().st_size for f in arquivos) / 1024
+            
+            print(f"{p.name:<15} | {qtd_arquivos:<10} | {tamanho_kb:<15.2f}")
+            total_arquivos += qtd_arquivos
+            
+        print("-" * 45)
+        print(f"TOTAL GERAL: {total_arquivos} arquivos Parquet encontrados.")
 
-print("\n" + "="*50)
+    # 2. Análise Lógica (Dados)
+    print(f"\n🧩 ANÁLISE DE DADOS (SCHEMA E CONTEÚDO)")
+    try:
+        # Leitura otimizada com PyArrow
+        df = pd.read_parquet(SILVER_DIR, engine='pyarrow')
+        
+        print(f"Dimensões do DataFrame: {df.shape[0]} linhas x {df.shape[1]} colunas")
+        
+        print("\nSchema Detectado:")
+        print(df.dtypes)
+        
+        print("\nAmostra de Dados (5 linhas):")
+        print(df.head())
+        
+        # Validação simples de estatística
+        media_salarial = df['salario'].mean()
+        print(f"\n📊 Média Salarial Global: R$ {media_salarial:.2f}")
+        
+    except Exception as e:
+        print(f"[ERRO] Falha ao ler os arquivos Parquet: {e}")
 
-# 2. Ler APENAS o Ceará (Filtro Inteligente)
-# Graças ao particionamento, o Pandas vai ler direto na pasta 'uf=CE'
-# sem precisar escanear os outros estados. Isso é performance pura.
-print(f"☀️ FILTRANDO SÓ CEARÁ (Fortaleza Representa!):")
+    print("\n" + "="*80)
+    print("✅ VALIDAÇÃO CONCLUÍDA")
 
-df_ce = pd.read_parquet(caminho_silver, filters=[('uf', '==', 'CE')])
-
-print(f"   Linhas do CE: {len(df_ce)}")
-print(f"   Média Salarial no CE: R$ {df_ce['salario'].mean():.2f}")
-print("\n   Primeiras 5 linhas do CE:")
-print(df_ce.head())
-print("="*50)
+if __name__ == "__main__":
+    main()
