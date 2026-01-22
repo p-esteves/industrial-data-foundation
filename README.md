@@ -11,6 +11,7 @@ O objetivo deste projeto é fornecer um artefato técnico que demonstre o domín
 * Implementação da arquitetura **Medallion** (Camadas Bronze e Silver).
 * Armazenamento otimizado em **Parquet** com particionamento Hive.
 * Validação de qualidade de dados via script de auditoria.
+* **Dockerizado:** Ambiente reprodutível com `docker-compose`.
 
 ## 🏗️ Arquitetura do Pipeline
 
@@ -26,62 +27,63 @@ O fluxo de dados é linear e determinístico, projetado para garantir idempotên
 As escolhas tecnológicas priorizam a execução "baterias inclusas" (baixo overhead) com ferramentas padrão de mercado:
 
 *   **Apache Airflow (2.10.x):** Padrão da indústria para orquestração baseada em código (Python).
+*   **Docker & Docker Compose:** Para isolamento e reprodutibilidade do ambiente.
 *   **Python 3.12:** Linguagem core da Engenharia de Dados.
 *   **Pandas & PyArrow:** Para manipulação em memória e escrita eficiente de formatos colunares.
-*   **Linux (WSL2):** Ambiente nativo de execução do Airflow.
+*   **PostgreSQL:** Banco de metadados do Airflow (no ambiente Docker).
 
 > **Justificativa:** A utilização do Airflow em modo Standalone elimina a necessidade de containers Docker pesados para validação funcional, mantendo a complexidade focada na lógica do pipeline e não na infraestrutura.
 
-## 🚀 Instruções de Execução (Local)
+## 🚀 Como Executar
 
-Pré-requisitos: Ambiente Linux (Ubuntu/WSL2) e Python 3 instalados.
+### Opção 1: Via Docker (Recomendado)
+Ideal para avaliação rápida e limpa, sem instalar dependências no seu sistema.
 
-### 1. Configuração do Ambiente
-```bash
-# 1. Clone o repositório
-git clone https://github.com/p-esteves/industrial-data-foundation.git
-cd industrial-data-foundation
+1.  **Inicie o ambiente:**
+    ```bash
+    docker-compose up -d
+    ```
+    *Aguarde alguns instantes até que os serviços (Webserver, Scheduler, Postgres) estejam saudáveis.*
 
-# 2. Crie e ative um ambiente virtual
-python3 -m venv venv
-source venv/bin/activate
+2.  **Acesse a interface:**
+    *   URL: `http://localhost:8080`
+    *   Login: `admin` / `admin`
 
-# 3. Instale as dependências
-pip install -r requirements.txt
-```
+3.  **Execute o Pipeline:**
+    *   Ative a DAG `industrial-data-foundation` (Toggle ON).
+    *   Clique em "Trigger DAG" (▶️).
 
-### 2. Inicialização do Airflow
-Configure o diretório home e inicialize o banco de dados local (SQLite):
+### Opção 2: Local (Python Nativo)
+Recomendado para desenvolvimento se você já possui ambiente Linux/WSL configurado.
 
-```bash
-export AIRFLOW_HOME=~/airflow
+1.  **Setup:**
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    pip install -r requirements.txt
+    
+    export AIRFLOW_HOME=~/airflow
+    airflow standalone
+    ```
 
-# Instalação/Inicialização modo Standalone (recomendado para dev)
-airflow standalone
-```
-*O comando acima inicializará o banco, criará um usuário admin e subirá os serviços (Webserver e Scheduler). Anote a senha gerada no terminal.*
-
-### 3. Deploy da DAG
-Em um novo terminal (com o venv ativo e AIRFLOW_HOME definido):
-
-```bash
-# Crie a pasta de DAGs se não existir
-mkdir -p ~/airflow/dags
-
-# Copie a DAG do projeto para o diretório do Airflow
-cp dags/caged_etl.py ~/airflow/dags/
-```
-
-### 4. Execução do Pipeline
-1.  Acesse a interface web em `http://localhost:8080`.
-2.  Faça login (usuário `admin` e senha gerada no passo 2).
-3.  Localize a DAG `industrial-data-foundation`.
-4.  Ative a DAG (toggle switch ON) e clique no botão ▶️ (Trigger DAG).
+2.  **Deploy:**
+    ```bash
+    mkdir -p ~/airflow/dags
+    cp dags/caged_etl.py ~/airflow/dags/
+    ```
 
 ## 🔎 Validação e Resultados
 
 Após a conclusão da DAG (todas as tasks verdes), execute o script de validação local para auditar o Data Lake gerado:
 
+
+**Se rodou via Docker:**
+```bash
+# Executa o script python usando o ambiente do container
+docker-compose run --rm airflow-webserver python ler_lake.py
+```
+
+**Se rodou Localmente:**
 ```bash
 python ler_lake.py
 ```
@@ -96,3 +98,19 @@ python ler_lake.py
 *   **Escopo de Demonstração:** O projeto foca na orquestração e estruturação de dados. A camada *Gold* (agregações de negócio) não foi incluída intencionalmente para manter o escopo focado na fundação dos dados.
 *   **Schema Fixo:** Assume-se que a fonte de dados mantém contrato estável. Em produção, seria necessário um *Schema Registry* ou validação de contrato mais robusta.
 *   **Armazenamento Local:** O Data Lake reside no filesystem local (`~/airflow/datalake`). Em produção, isso seria substituído por S3, GCS ou Azure Blob Storage alterando apenas a variável `BASE_DIR`.
+
+## 🧪 Testes Automatizados
+
+O projeto inclui uma suíte de testes de simulação que valida a lógica ETL (Extração, Transformação e Carga) isoladamente, sem necessidade de subir toda a infraestrutura do Airflow. Útil para CI/CD ou ambientes de desenvolvimento restritos.
+
+**Para rodar a simulação:**
+
+Linux/Mac:
+```bash
+python tests/simulate_pipeline.py
+```
+
+Windows (Script Automático):
+```cmd
+tests\run_test.bat
+```

@@ -10,7 +10,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Definir diretórios base usando pathlib
-BASE_DIR = Path.home() / 'airflow' / 'datalake'
+import os
+
+# Configurar caminhos via variáveis de ambiente para suportar Docker e Local
+# Default (Local): ~/airflow/datalake
+# Docker: /opt/airflow/datalake (definido no docker-compose)
+DEFAULT_PATH = Path.home() / 'airflow' / 'datalake'
+BASE_DIR = Path(os.getenv('AIRFLOW_DATALAKE_PATH', DEFAULT_PATH))
 BRONZE_DIR = BASE_DIR / 'bronze'
 SILVER_DIR = BASE_DIR / 'silver'
 

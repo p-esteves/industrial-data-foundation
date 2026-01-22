@@ -3,7 +3,9 @@ from pathlib import Path
 import os
 
 # Configuração de caminhos (Assumindo estrutura padrão do Airflow local)
-BASE_DIR = Path.home() / 'airflow' / 'datalake'
+# Configuração de caminhos (Compatível com Docker e Local)
+DEFAULT_PATH = Path.home() / 'airflow' / 'datalake'
+BASE_DIR = Path(os.getenv('AIRFLOW_DATALAKE_PATH', DEFAULT_PATH))
 SILVER_DIR = BASE_DIR / 'silver' / 'caged_processed.parquet'
 
 def main():

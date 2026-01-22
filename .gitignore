@@ -1,1 +1,10 @@
 venv/
+datalake/
+logs/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+venv_test/
+test_datalake/
+
